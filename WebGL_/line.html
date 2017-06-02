@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+
+</head>
+<body>
+<canvas id="webgl" width="1000" height="500">
+    Please use a browser that supports "canvas"
+</canvas>
+<script src="./lib/webgl-utils.js"></script>
+<script src="./lib/webgl-debug.js"></script>
+<script src="./lib/cuon-utils.js"></script>
+<script src="./lib/cuon-matrix.js"></script>
+<script>
+    window.onload = function () {
+        mian()  ;
+    };
+
+    function mian(){
+        var vs =
+                " attribute vec4 a_Position;\n" +
+                " void main(){\n" +
+                "   gl_Position = a_Position;\n" +
+                "}\n";
+        var fs =
+                " precision mediump float;\n" +
+                " void main(){\n" +
+                "   gl_FragColor = vec4(1.0,0.0,0.0,1.0);\n" +
+                "}\n";
+        var canvas = document.getElementById('webgl');
+
+        // Get the rendering context for WebGL
+        var gl = getWebGLContext(canvas);
+        if (!gl) {
+            console.log('Failed to get the rendering context for WebGL');
+            return;
+        }
+        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        //gl.enable(gl.DEPTH_TEST);
+        if (!initShaders(gl, vs, fs)) {
+            console.log('Failed to intialize shaders.');
+            return;
+        }
+        var arr = new Float32Array([
+                0.1,-0.05,0.0,
+                -0.1,-0.05,0.0
+        ]);
+        var N = initVertexBuffers(gl,arr);
+
+        var indexBuffer = gl.createBuffer();
+        if (!indexBuffer)
+            return -1;
+
+        gl.drawArrays(gl.LINE_STRIP, 0, N/3);
+        //gl.drawElements(gl.LINE_STRIP, 6, gl.UNSIGNED_BYTE, 0);
+
+    }
+    function initVertexBuffers(gl,arr) {
+        var zx,zy,zz,zr;
+        let a ,sin,cos;
+        let n = 20;
+        var ai = Math.PI/n;
+        let positions = [],indices=[];
+        for (let i = 0; i <= n; i++) {
+            a = ai*i;
+            sin = Math.sin(a);
+            cos = Math.cos(a);
+            zx = arr[0]+arr[3];
+            zy = arr[1]+arr[4];
+            zz = arr[2]+arr[5];
+            zr = Math.sqrt(Math.pow( (arr[0]-arr[3]),2 ) + Math.pow( (arr[1]-arr[4]),2 ));
+            console.log(zx);
+            console.log(zy);
+            console.log(zr);
+            positions.push(cos*zr - zx/2 );
+            positions.push(sin*zr - zy/2 );
+            positions.push(0.0*zr - zz/2 );
+        }
+        if (!initArrayBuffer(gl, new Float32Array(positions), 3, gl.FLOAT, 'a_Position')) return -1;
+        return positions.length;
+    }
+    function initArrayBuffer(gl, data, num, type, attribute) {
+        // Create a buffer object
+        var buffer = gl.createBuffer();
+        if (!buffer) {
+            console.log('Failed to create the buffer object');
+            return false;
+        }
+        // Write date into the buffer object
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, data, gl.STATIC_DRAW);
+        // Assign the buffer object to the attribute variable
+        var a_attribute = gl.getAttribLocation(gl.program, attribute);
+        if (a_attribute < 0) {
+            console.log('Failed to get the storage location of ' + attribute);
+            return false;
+        }
+        gl.vertexAttribPointer(a_attribute, num, type, false, 0, 0);
+        // Enable the assignment of the buffer object to the attribute variable
+        gl.enableVertexAttribArray(a_attribute);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+        return true;
+    }
+
+</script>
+</body>
+</html>

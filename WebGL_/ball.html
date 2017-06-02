@@ -1,0 +1,322 @@
+
+<!doctype html>
+<html>
+<head>
+    <title>WebGL绘制球体 - www.web-tinker.com</title>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <script src="lib/cuon-matrix.js" type="text/javascript"></script>
+    <script src="lib/jquery.min.js" type="text/javascript"></script>
+    <script id="vs_s" type="text/plain">
+    //顶点着色器
+    attribute vec3 po;
+    attribute vec2 mp;
+    attribute vec3 no;
+    uniform mat4 tra;
+    uniform mat4 pro;
+    uniform vec3 li_co;
+    uniform vec3 li_di;
+    varying vec3 li;
+    varying vec2 mp_v;
+    void main(){
+      gl_Position=pro*tra*vec4(po,1.0);
+      mp_v=mp;
+      vec3 no_di=(tra*vec4(no,0.0)).xyz;
+      float li_we=max(-dot(li_di,no_di),0.0);
+      //由于颜色必须从贴图上计算
+      //这里直接把光照变化向量传入片段着色器
+      li=li_we*li_co;
+    }
+  </script>
+    <script id="fs_s" type="text/plain">
+    //片段着色器
+    uniform lowp vec3 li_en;
+    uniform sampler2D tex;
+    varying lowp vec3 li;
+    varying lowp vec2 mp_v;
+    void main(){
+      gl_FragColor=texture2D(tex,mp_v)*vec4(li,1.0)+vec4(li_en,1.0);
+    }
+  </script>
+    <script>
+        //准备
+        var webgl,program,vs,fs,dat,tmp,i,j;
+        $(document).ready(function(){
+
+            webgl=canvas.getContext("experimental-webgl");
+            program=webgl.createProgram();
+            vs=webgl.createShader(webgl.VERTEX_SHADER);
+            fs=webgl.createShader(webgl.FRAGMENT_SHADER);
+            webgl.shaderSource(vs,vs_s.textContent);
+            webgl.shaderSource(fs,fs_s.textContent);
+            webgl.compileShader(vs);
+            webgl.compileShader(fs);
+            webgl.attachShader(program,vs);
+            webgl.attachShader(program,fs);
+            webgl.linkProgram(program);
+            webgl.useProgram(program);
+
+            //顶点属性相关
+            var po,mp,no,count;
+            po=webgl.getAttribLocation(program,"po");
+            mp=webgl.getAttribLocation(program,"mp");
+            no=webgl.getAttribLocation(program,"no");
+            webgl.enableVertexAttribArray(po);
+            webgl.enableVertexAttribArray(mp);
+            webgl.enableVertexAttribArray(no);
+
+            //第一个参数n是循环次数，也就是绘制球体的精细程度
+            //zx\zy\zz是针对x、y、z轴各自的缩放参数
+            //zc,zs, z axis collapse对球体进行凹陷处理，zc、zs球坐标模型进行处理长度为2的数组，表示两组显示范围
+            //ec, equator collapse 对球体进行赤道平面进行凹陷处理，长度为2的数组
+            //po,mp,no是数组引用
+            function genBall(n,zx,zy,zz,zc,zs,ec,po,mp,no){
+                var i,j,k;
+                var f=function(a,b){
+                    var a=Math.PI*a/n,
+                            b=2*Math.PI*b/n,
+                            l= Math.sin(a);
+
+                    var y = Math.sin(b)*l;
+                    var z = Math.cos(a);
+                    var x = Math.cos(b)*l;
+
+                    var d1 = Math.PI/180;
+                    //console.log(a);
+
+                    x *= zx;
+                    y *= zy;
+                    z *= zz;
+
+
+                    /* if(b > 10 *d1 && b<40*d1){//经度显示范围控制
+                     z=x=y=0;
+                     }
+                     if(a<90*d1 && a>80*d1){
+                     z = 0;
+                     x=y=0;
+                     }//*/
+
+
+                    if(b>ec[0]*d1 && b<ec[1]*d1){//经度显示范围控制
+                        z=x=y=0;
+                    }
+
+                    if(a>zc[0]*d1 && a<zc[1]*d1){
+                        z=0;
+                        x=y=0;
+                    }else if(a>zs[0]*d1 && a<zs[1]*d1){
+                        z=x=y=0;
+                    }
+                    //*/
+
+                    return [y,z,x];//-->坐标s顺序为y\z\x
+                }; //f是球体方程的函数
+
+                for(i=1;i<=n;i++)
+                    for(j=1;j<=n;j++){ //二重循环遍历球体方程的两参数
+                        //这里我就不用索引了，直接把每个四边形需要的6个顶点都用上
+                        k=[].concat(f(i,j),f(i-1,j),f(i,j-1),f(i,j-1),f(i-1,j),f(i-1,j-1));
+                        //po是顶点坐标数组，从参数传入指针的
+                        po.push.apply(po,k);
+
+                        //no是每个顶点的法向量，光照效果会用到
+                        //单位球体的顶点法向量就是球心在原点上时的顶点坐标
+                        no.push.apply(no,k);
+                        //这个是球面上贴图的坐标
+                        mp.push(
+                                j/n,n-i/n, j/n,n-(i-1)/n, (j-1)/n,n-i/n,
+                                (j-1)/n,n-i/n, j/n,n-(i-1)/n, (j-1)/n,n-(i-1)/n
+                        );
+                    };
+                return n*n*6; //返回顶点个数，绘制的时候要用到
+            }
+
+            function plot(){
+
+                var xcomp = parseFloat($("#x-comp").val()) * parseFloat($("#x-comp-s").val());
+                xcomp=(xcomp == NaN)?1:xcomp;
+
+                var ycomp = parseFloat($("#y-comp").val()) * parseFloat($("#y-comp-s").val());
+                ycomp=(ycomp == NaN)?1:ycomp;
+
+                var zcomp = parseFloat($("#z-comp").val()) * parseFloat($("#z-comp-s").val());
+                zcomp=(zcomp == NaN)?1:zcomp;
+
+                var onGrid = $("#show-grid").is(":checked");
+
+                var  north = parseToArray($("#north-sunken").val());
+                var  south = parseToArray($("#south-sunken").val());
+                var  equator = parseToArray($("#equator-sunken").val());
+
+
+                var zc=[0,50],zs=[130,170],ec=[10,140];
+                zc=north;
+                zs=south;
+                ec=equator;
+                count=genBall(8,xcomp,ycomp,zcomp,zc,zs,ec,po_dat=[],mp_dat=[],no_dat=[]);
+
+                console.log(po_dat);
+                console.log(mp_dat);
+                console.log(no_dat);
+                webgl.bindBuffer(webgl.ARRAY_BUFFER,webgl.createBuffer());
+                webgl.bufferData(webgl.ARRAY_BUFFER,new Float32Array(po_dat),webgl.STATIC_DRAW);
+                webgl.vertexAttribPointer(po,3,webgl.FLOAT,false,0,0);
+
+                webgl.bindBuffer(webgl.ARRAY_BUFFER,webgl.createBuffer());
+                webgl.bufferData(webgl.ARRAY_BUFFER,new Float32Array(mp_dat),webgl.STATIC_DRAW);
+                webgl.vertexAttribPointer(mp,2,webgl.FLOAT,false,0,0);
+
+                webgl.bindBuffer(webgl.ARRAY_BUFFER,webgl.createBuffer());
+                webgl.bufferData(webgl.ARRAY_BUFFER,new Float32Array(no_dat),webgl.STATIC_DRAW);
+                webgl.vertexAttribPointer(no,3,webgl.FLOAT,false,0,0);
+
+                //全局属性相关
+                var tra,pro,tex,li_co,li_di,li_en;
+                tra=webgl.getUniformLocation(program,"tra");//旋转矩阵
+                pro=webgl.getUniformLocation(program,"pro");//透视投影可视空间
+                tex=webgl.getUniformLocation(program,"tex");
+                li_co=webgl.getUniformLocation(program,"li_co");
+                li_di=webgl.getUniformLocation(program,"li_di");
+                li_en=webgl.getUniformLocation(program,"li_en");
+                webgl.uniformMatrix4fv(pro,false,[
+                    1,0,0,0, 0,1,0,0, 0,0,-1,-1, 0,0,-2,0
+                ]);
+                webgl.uniform3fv(li_co,[1.0,1.0,1.0]);
+                tmp=-1/Math.sqrt(3); //方向向量是一个单位向量
+                webgl.uniform3fv(li_di,[tmp,tmp,tmp]); //光源在右后上角
+                webgl.uniform3fv(li_en,[0.2,0.2,0.2]);
+                var img=new Image;
+                img.src="resources/orange.jpg";
+                img.onload=function(){
+                    if(!onGrid){
+                        var texture=webgl.createTexture();
+                        webgl.activeTexture(webgl.TEXTURE0);
+                        webgl.bindTexture(webgl.TEXTURE_2D,texture);
+                        webgl.texImage2D(webgl.TEXTURE_2D,0,webgl.RGB,webgl.RGB,webgl.UNSIGNED_BYTE,img);
+                        webgl.texParameteri(webgl.TEXTURE_2D,webgl.TEXTURE_MIN_FILTER,webgl.LINEAR_MIPMAP_LINEAR);
+                        webgl.generateMipmap(webgl.TEXTURE_2D);
+                        webgl.uniform1i(tex,0);
+                    }
+                    if(window.innr){
+                        clearInterval(window.innr);
+                        //window.draw = true;
+                    }
+                    draw();
+                };
+
+
+                //绘制相关
+                webgl.enable(webgl.DEPTH_TEST);
+                webgl.pixelStorei(webgl.UNPACK_FLIP_Y_WEBGL,true);
+
+                var viewDeg = 90;
+                function draw(){
+                    var a=0;
+                    window.innr = setInterval(function(){
+                        var s=Math.sin(a),c=Math.cos(a);
+                        //a+=0.02;
+                        b=new Float32Array([
+                            c,0,s,0,
+                            0,1,0,0,
+                            -s,0,c,0,
+                            0,0,-2.5,1
+                        ]);//这里是控制球在xy绕z轴旋转的矩阵
+
+                        var vm = new Matrix4();
+                        vm.elements=b;
+                        vm.rotate(viewDeg,1,0,0);//设置绕x轴一定角度角旋转
+                        //vm.lookAt(1.0,-0.0,-0.0, 0,0,0, 0,0,1);
+
+                        webgl.uniformMatrix4fv(tra,false,vm.elements);
+                        webgl.clearColor(0.0,0.0,0.0,1.0);
+                        webgl.clear(webgl.COLOR_BUFFER_BIT);
+                        var type = webgl.TRIANGLES;
+                        if(onGrid)
+                            type=webgl.LINES;
+                        webgl.drawArrays(type,0,count);
+                    },30);
+                };
+
+                //通过鼠标改变观察的x、y方向的视角
+                $("#canvas").bind('mousemove',function(e){
+                    var x = e.clientX;
+                    var y = e.clientY;
+
+                    var rect = e.target.getBoundingClientRect();
+                    x = ((x-rect.left) - canvas.width/2)/(canvas.width/2);
+                    y = (canvas.height/2 - (y-rect.top))/(canvas.height/2);
+                    viewDeg = Math.atan2(y,x)/Math.PI * 180;
+                });
+
+            }
+
+            plot();
+            $("#reload").bind("click",function(){
+                plot();
+            });
+            function parseToArray(s){
+                var s = s.split(',');
+                if(s.length < 2)
+                    return [0];
+
+                var a = parseFloat(s[0]);
+                var b = parseFloat(s[1]);
+                if(a == NaN || b == NaN)
+                    return [0];
+                return [a,b];
+            }
+        });
+    </script>
+</head>
+<body>
+<div class="panel">
+    <canvas id="canvas" width="800" height="800"></canvas>
+</div>
+<div id="control-panel">
+    <div id="comp">
+        <span>压缩因子：</span>
+        <ul>
+            <li>x轴：<input id="x-comp" type="text" size="6" name=""  value=1>
+                <input id="x-comp-s" type="range" min="0" step="0.01" max="1" name="" value=1>
+            </li>
+            <li>y轴：<input id="y-comp" type="text" size="6" name=""  value=1>
+                <input id="y-comp-s" type="range" min="0" step="0.01" max="1" name="" value=1>
+            </li>
+            <li>z轴：<input id="z-comp" type="text" size="6" name=""  value=1>
+                <input id="z-comp-s" type="range" min="0" step="0.01" max="1" name="" value=1>
+            </li>
+        </ul>
+    </div>
+    <div id="grid">
+        <span>显示方式：</span>
+        <ul>
+            <li>
+                仅显示网格：<input id="show-grid" type="checkbox" checked name="">
+            </li>
+        </ul>
+    </div>
+
+    <div id="sunken-on">
+        <span>极轴凹陷：</span>
+        <ul>
+            <li>
+                Z轴北极凹陷范围（0-90度）：<input id="north-sunken" size="6" type="text" name="" value="0">
+            </li>
+            <li>
+                Z轴南极凹陷范围（90-180度）：<input id="south-sunken" size="6" type="text" name="" value="0">
+            </li>
+            <li>
+                赤道凹陷范围（0-360度）：<input id="equator-sunken" size="6" type="text" name="" value="0">
+            </li>
+        </ul>
+    </div>
+    <div><button id="reload">重绘</button></div>
+</div>
+
+<style type="text/css">
+    .panel{width: 800px; height: 800px; float: right;}
+    #control-panel{width: 400px; position: relative; float: left; height: 500px; top: 0px;}
+
+</style>
+
+</body>

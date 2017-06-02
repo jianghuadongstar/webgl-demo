@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<canvas id="canvas" width=200 height=200 style="border: 1px solid #ccc;"></canvas>
+<script>
+    draw();
+    function draw() {
+        var canvas=document.getElementById('canvas');
+        var context=canvas.getContext('2d');
+        //绘制起始点、控制点、终点
+        context.beginPath();
+        context.moveTo(20,170);
+        context.lineTo(130,40);
+        context.lineTo(180,150);
+        context.stroke();
+
+        //绘制2次贝塞尔曲线
+       /* context.beginPath();
+        context.moveTo(20,170);
+        context.quadraticCurveTo(130,40,180,150);
+        context.strokeStyle = "red";
+        context.stroke();*/
+        context.strokeStyle ="#FF5D43";
+        context.beginPath();
+        context.moveTo(0,200);
+        context.quadraticCurveTo(100,100,300,200);
+        context.stroke();
+    }
+</script>
+</body>
+</html>
