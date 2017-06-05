@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=1">
+    <title>canvas 探照灯演示</title>
+    <style>
+        body{
+            margin: 0;
+            padding: 0;
+        }
+        #canvas{
+            display: block;
+            position: relative;
+            margin: auto;
+        }
+
+    </style>
+</head>
+<body>
+<canvas id="canvas">
+    您的浏览器不支持，请用升级浏览器或下载chrome浏览器体验
+</canvas>
+<script>
+    var ball={
+        x:200,
+        y:200,
+        r:150,
+        vx:7+Math.random()*5,
+        vy:3+Math.random()*5
+    };
+    var B = true;
+    window.onload= function () {
+        var canvas=document.getElementById("canvas");
+        var context=canvas.getContext('2d');
+        canvas.width=window.innerWidth;
+        canvas.height=window.innerHeight;
+        if (context){//判断是否支持canvas
+            setInterval(function () {
+                Draw (context,canvas.width,canvas.height);
+                ballMove(canvas.width,canvas.height);
+            },50);
+
+            canvas.addEventListener("click", function () {
+                var x = event.clientX - canvas.getBoundingClientRect().left;
+                var y = event.clientY - canvas.getBoundingClientRect().top;
+                var click_this=context.isPointInPath(x,y);
+                if ( click_this ){
+                    B = false;
+                }else {
+                    B = true;
+                }
+            });
+        }else {
+            alert("您的浏览器不支持，请用升级浏览器或下载chrome浏览器体验");
+        }
+    };
+    function ballMove(canvasW,canvasH){
+        if ( B ){
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+        }
+        if( ball.y >= canvasH-ball.r || ball.y <= ball.r ){
+            ball.vy = - ball.vy;
+        }
+        if( ball.x >= canvasW-ball.r || ball.x <= ball.r ){
+            ball.vx = -ball.vx;
+        }
+        return ball
+    }
+
+    function Draw (context,W,H){
+        console.log("还在进行");
+        context.clearRect(0,0,W, H);
+        context.save();
+
+        context.beginPath();
+        context.fillStyle = "black";
+        context.fillRect(0,0,W, H);
+        context.closePath();
+
+        context.beginPath();
+        context.arc(ball.x,ball.y,ball.r,0,Math.PI*2);
+        context.fillStyle = "#fff";
+        context.fill();
+        context.clip();
+
+        var imgs=new Image();
+        imgs.src="../imgs/c1.jpg";
+        context.fillStyle = context.createPattern(imgs,"repeat");
+        context.fill();
+
+        context.restore();
+    }
+
+</script>
+</body>
+</html>
